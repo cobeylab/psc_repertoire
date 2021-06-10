@@ -1,0 +1,5 @@
+Notes for the methods section:
+
+We followed Davidsen & Matsen's (IV?) (2018) benchmarking study and used SAMM to rank equally parsimonious trees (obtained by dnapars) based on their likelihood under the S5F model. I slightly adapted code from their repo (by Kristian Davidsen) to parse the output from dnapars.
+
+We'll be using SAMM as a git submodule. Add note to repo readme with instructions on how to clone submodules after cloning main repo.
