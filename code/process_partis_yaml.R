@@ -77,7 +77,7 @@ remove_allgap_sites <- function(seqs, gap_character = '-'){
     seqmatrix <- seqmatrix[,allgap_sites == F]
     adjusted_seqs <- apply(seqmatrix,1,paste,collapse ='')
   }else{
-    adjusted_seqs <- seqs
+    adjusted_seqs <- str_remove_all(seqs, gap_character)
   }
   return(adjusted_seqs)
 }
@@ -93,6 +93,7 @@ get_basic_clone_info <- function(clone, isotype_info = NULL){
   
    clone_seqs <- tibble(seq_id = clone$unique_ids, in_frame = clone$in_frames, has_stop_codon = clone$stops,
                        key_residues_conserved = !clone$mutated_invariants, seq = clone$input_seqs)
+   
   if(!is.null(isotype_info)){
     clone_seqs <- left_join(clone_seqs, isotype_info %>% mutate(seq_id = Name, isotype = Isotype) %>% 
                               select(seq_id, isotype))
@@ -407,8 +408,7 @@ process_partis_yaml <- function(yaml_file_path, igblast_annotation_path, output_
       }
     }else{
       # clone nas no productive sequences
-      excluded_clones <- bind_rows(excluded_clones,
-                                   tibble(clone = paste0(dataset_name, '_clone_', clone_number),
+      excluded_clones <- bind_rows(excluded_clones,tibble(clone = paste0(dataset_name, '_clone_', clone_number),
                                           n_seqs = length(!!clone$unique_ids)))
     }
    clone_number <- clone_number + 1

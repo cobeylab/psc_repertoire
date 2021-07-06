@@ -7,6 +7,28 @@ igphyml_files <- list.files('../results/igphyml/', recursive = T, pattern = 'sta
 
 divergence_files <- list.files('../results/aa_divergence/', full.names = T)
 
+# Import only divergence results for clones with IgPhyml results 
+# (so we only look at the top clones, excluding any that have fewer than 2 seqs.)
+retrieve_clone_id <- function(file_path){}
+
+
+igphyml_clone_ids <- unlist(lapply(as.list(igphyml_files),
+                            FUN = function(x){
+                              clone_id = rev(strsplit(x,'/')[[1]])[1]
+                              clone_id = str_remove(clone_id, '_noCDR3_igphyml_stats.tab')
+                            }))
+
+
+divergence_files_clone_ids <- unlist(lapply(as.list(divergence_files),
+                                     FUN = function(x){
+                                       clone_id = rev(strsplit(x,'/')[[1]])[1]
+                                       clone_id = str_remove(clone_id, '_pairwise_divergence.csv')
+                                     }))
+
+divergence_files <- divergence_files[divergence_files_clone_ids %in% igphyml_clone_ids]
+                                     
+                                     
+
 igphyml_results <- lapply(as.list(igphyml_files), 
        FUN = function(path){
          dataset <- str_split(path,'\\/')[[1]]
@@ -21,7 +43,8 @@ igphyml_results <- lapply(as.list(igphyml_files),
            select(dataset, clone_number, everything())
        })
 
-igphyml_results <- bind_rows(igphyml_results)
+igphyml_results <- bind_rows(igphyml_results) %>%
+  arrange(dataset)
 
 write_csv(igphyml_results,'../results/combined_igphyml_results.csv')
   
@@ -47,10 +70,11 @@ dNdS_plot <- long_format_tibble %>%
   scale_x_discrete(labels = function(x){str_remove(x,'_HC')}) +
   geom_hline(yintercept = 1, linetype = 2) +
   background_grid() +
-  theme(legend.position = c(0.9,0.9))
+  theme(legend.position = c(0.9,0.9)) +
+  scale_y_log10()
 
 save_plot('../figures/IgPhyML_dNdS.pdf',dNdS_plot,
-          base_width = 10, base_height = 6)
+          base_width = 12, base_height = 6)
   
 
 divergence_results <- lapply(as.list(divergence_files),
@@ -85,7 +109,7 @@ divergence_results_pl <- divergence_results %>%
   background_grid() +
   theme(legend.position = c(0.9,0.9))
 save_plot('../figures/divergence_from naive.pdf', divergence_results_pl,
-          base_width = 10, base_height = 6)
+          base_width = 12, base_height = 6)
   
 
   

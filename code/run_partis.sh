@@ -26,7 +26,7 @@ echo "#SBATCH --ntasks-per-node=16" >> $sbatch_file
 
 
 # Run partis partition:
-echo "/project2/cobey/partis/bin/partis partition --n-procs 15 --infname" $fasta_file "--outfname ../results/partis/"$file_id".yaml" "--extra-annotation-columns regional_bounds:cdr3_seqs" >> $sbatch_file
+echo "/project2/cobey/partis/bin/partis partition --n-procs 15 --infname" $fasta_file "--outfname ../results/partis/"$file_id".yaml" "--extra-annotation-columns regional_bounds:cdr3_seqs:cdr3_seqs:seqs_aa:naive_seq_aa" >> $sbatch_file
 
 # Igblast run to identify FRs and CDRs.
 echo "module load python/anaconda-2020.02" >> $sbatch_file

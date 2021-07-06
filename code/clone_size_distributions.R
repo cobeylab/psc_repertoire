@@ -39,7 +39,7 @@ plot_rank_abundance <- function(clone_info_files, output_dir = '../figures/'){
   
   # Order patients by absolute size of largest clone 
   patient_order <- as.character(size_dist %>% filter(abundance_rank == 1) %>%
-    arrange(desc(n_unique_seqs)) %>% pull(patient))
+    arrange(desc(n_seqs)) %>% pull(patient))
   
   # Patients missing from 10x data will come at the end in whatever order
   #patient_order <- c(patient_order, unique(size_dist$patient)[(unique(size_dist$patient) %in% patient_order) == F])

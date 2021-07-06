@@ -29,7 +29,7 @@ echo mafft --op 5 --thread -1 '$INPUT_FILE' '>' '$OUTPUT_FILE' >> $sbatch_file
 
 
 # Align only clones with at least MINSEQ sequences:
-MINSEQ=4
+MINSEQ=2
 
 # Get all clone identifiers
 ls ../results/partis/${dataset}_clones/${dataset}_clone_* | grep -v 'alignment' | grep -v '.csv'| grep -o 'clone_[0-9]*'|tr -d [a-z_] > clone_ids_${dataset}.tmp
