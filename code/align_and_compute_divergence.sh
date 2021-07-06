@@ -22,8 +22,15 @@ echo module load mafft/7.310  >> $sbatch_file
 echo INPUT_FILE=../results/partis/${dataset}_clones/${dataset}_clone_'${SLURM_ARRAY_TASK_ID}'.fasta >> $sbatch_file
 echo OUTPUT_FILE=../results/partis/${dataset}_clones/${dataset}_clone_'${SLURM_ARRAY_TASK_ID}'_alignment.fasta >> $sbatch_file
 
+
 echo mafft --op 5 --thread -1 '$INPUT_FILE' '>' '$OUTPUT_FILE' >> $sbatch_file
 
+# Immediately after aligning, compute pairwise divergence
+echo python calculate_aa_divergence.py '$OUTPUT_FILE' NAIVE >> $sbatch_file
+
+# Also calculate pairwise divergence for (pre-generated) CDR3 alignment
+echo CDR_aln_file=../results/partis/${dataset}_clones/${dataset}_clone_'${SLURM_ARRAY_TASK_ID}'_CDR3_alignment.fasta >> $sbatch_file
+echo python calculate_aa_divergence.py '$CDR_aln_file' NAIVE >> $sbatch_file
 
 # ----------------------------------------------------------------------------------------
 

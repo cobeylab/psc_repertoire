@@ -16,6 +16,21 @@ if(is.na(isotype_info_path)){
   isotype_info_path <- NULL
 }
 
+# Creates tibble linking duplicated sequences to those chosen as the representative sequence
+pair_duplicates <- function(clone){
+  duplicate_seqs <- c()
+  for(i in 1:length(clone$duplicates)){
+    representative_seq = clone$unique_ids[i]
+    duplicates <- clone$duplicates[[i]]
+    if(length(duplicates) > 0){
+      duplicate_seqs <- bind_rows(duplicate_seqs,
+                                  tibble(duplicate_seq = duplicates, representative_seq))
+    }
+  }
+  return(duplicate_seqs)
+}
+
+
 # Converts a range of positions in an ungapped sequence to a range in the same sequence with gaps
 # For CDR3 bounds in alignment given bounds in germline sequence
 
@@ -92,26 +107,54 @@ get_basic_clone_info <- function(clone, isotype_info = NULL){
                        v_gene = clone$v_gene, d_gene = clone$d_gene, j_gene = clone$j_gene)
   
    clone_seqs <- tibble(seq_id = clone$unique_ids, in_frame = clone$in_frames, has_stop_codon = clone$stops,
-                       key_residues_conserved = !clone$mutated_invariants, seq = clone$input_seqs)
+                       key_residues_conserved = !clone$mutated_invariants, seq = clone$input_seqs,
+                       cdr3_seq = clone$cdr3_seqs)
    
-  if(!is.null(isotype_info)){
-    clone_seqs <- left_join(clone_seqs, isotype_info %>% mutate(seq_id = Name, isotype = Isotype) %>% 
-                              select(seq_id, isotype))
-    n_unique_igg <- length(clone_seqs %>% filter(grepl('IgG', isotype)) %>% pull(seq_id))
-    n_unique_iga <- length(clone_seqs %>% filter(grepl('IgA', isotype)) %>% pull(seq_id))
-    
-    clone_info <- clone_info %>% mutate(n_unique_igg, n_unique_iga) %>%
-      select(n_seqs, n_unique_seqs, n_unique_igg, n_unique_iga, everything())
-  }
-  
-  # Add germline sequence and remove 'N' characters introduced by partis for sites outside of VDJ region
+   if(!is.null(isotype_info)){
+     clone_seqs <- left_join(clone_seqs, isotype_info %>% mutate(seq_id = Name, isotype = Isotype) %>% 
+                               select(seq_id, isotype))
+     n_unique_igg <- length(clone_seqs %>% filter(grepl('IgG', isotype)) %>% pull(seq_id))
+     n_unique_iga <- length(clone_seqs %>% filter(grepl('IgA', isotype)) %>% pull(seq_id))
+     
+     clone_info <- clone_info %>% mutate(n_unique_igg, n_unique_iga) %>%
+       select(n_seqs, n_unique_seqs, n_unique_igg, n_unique_iga, everything())
+   }
+   
+   # Make duplicate sequences explicit
+   duplicates <- pair_duplicates(clone)
+   if(is.null(duplicates) == F){
+     duplicates <- left_join(duplicates %>% dplyr::rename(seq_id = representative_seq), clone_seqs) %>%
+       select(-seq_id) %>%
+       dplyr::rename(seq_id = duplicate_seq)
+     clone_seqs <- bind_rows(clone_seqs, duplicates)
+   }
+   
+   clone_seqs <- clone_seqs %>%
+     mutate(is_productive = (has_stop_codon == F)&(in_frame)&(key_residues_conserved == T))
+   
+   
+  # Remove 'N' characters introduced by partis for sites outside of VDJ region
   clone_seqs <- clone_seqs %>%
-    mutate(seq = str_replace_all(seq,'N','')) %>% pull(seq)
+    mutate(seq = str_replace_all(seq,'N','')) 
   
-  clone_seqs <- c(str_replace_all(clone$naive_seq, 'N',''), clone_seqs)
-  names(clone_seqs) <- c('NAIVE', clone$unique_ids)
-    
-  return(list('info' = clone_info, 'seqs' = clone_seqs))
+  # Get Naive seq
+  cdr3_start <- clone$codon_positions$v + 1 # Adds one because partis numbering starts at 0
+  cdr3_end <- clone$codon_positions$j + 3 # adds +1 and then +2 to go to end of codon
+  naive_cdr3_seq <- str_sub(clone$naive_seq, cdr3_start, cdr3_end)
+  naive_seq = str_replace_all(clone$naive_seq, 'N','')
+  
+  # Output vectors
+  
+  # (Adding a value T at the beginning representing naive sequence)
+  is_productive <- c(T, clone_seqs$is_productive)
+  
+  clone_cdr3_seqs <- c(naive_cdr3_seq, clone_seqs$cdr3_seq)
+  names(clone_cdr3_seqs) <- c('NAIVE', clone_seqs$seq_id)
+  
+  clone_seqs <- c(naive_seq, clone_seqs$seq)
+  names(clone_seqs) <- names(clone_cdr3_seqs)
+  
+  return(list('info' = clone_info, 'seqs' = clone_seqs, 'cdr3_seqs' = clone_cdr3_seqs, 'is_productive' = is_productive))
 }
 
 # Replaces codons containing a gap with 'NNN'
@@ -204,25 +247,34 @@ process_partis_yaml <- function(yaml_file_path, igblast_annotation_path, output_
     raw_clone_fasta_file <- paste0(parent_clone_dir, dataset_name,'_clone_',
                                    clone_number,'.fasta') 
     
+    aligned_cdr3_seqs_file <- paste0(parent_clone_dir, dataset_name,'_clone_',
+                                     clone_number,'_CDR3_alignment.fasta') 
+    
     # Update tibble with general clone information
+    this_clone_info <- get_basic_clone_info(clone, isotype_info)
+    
+    
     clone_info <- bind_rows(clone_info,
-                            get_basic_clone_info(clone, isotype_info)$info %>%
+                            this_clone_info$info %>%
                               mutate(clone_id = clone_number)) %>%
       select(clone_id, everything())
     
     # Write raw clone seqs + germline (with 'N's removed but without processing for igphyml)
-    clone_seqs <- get_basic_clone_info(clone, isotype_info)$seqs
+    clone_seqs <- this_clone_info$seqs
     write.fasta(as.list(clone_seqs), names = names(clone_seqs), file.out =  raw_clone_fasta_file)
     
+    # Write (aligned) CDR3 seqs
+    cdr3_seqs <- tolower(this_clone_info$cdr3_seqs)
+    write.fasta(as.list(cdr3_seqs), names = names(cdr3_seqs), file.out = aligned_cdr3_seqs_file)
+    
     # Constrain igphyml input to productive sequences
-    is_productive <- (clone$stops == F)&(clone$in_frames)&(clone$mutated_invariants == F)
+    productive_seqs <- names(clone_seqs)[this_clone_info$is_productive]
     
-    productive_seqs <- clone$unique_ids[is_productive]
-    
-    if(length(productive_seqs)>0){
+    # If there's at least one productive sequence besides the NAIVE one 
+    if(length(productive_seqs)>1){
       
       # Check all clone seqs. in yaml file are also in presto annotation file. 
-      stopifnot(all(clone$unique_ids %in% igblast_annotation$SEQUENCE_ID))
+      stopifnot(all(names(clone_seqs)[names(clone_seqs) != 'NAIVE'] %in% igblast_annotation$SEQUENCE_ID))
       
       # Initial processing of inferred naive sequence (remove 'N' characters at each end of germline sequence)
       naive_seq <- clone$naive_seq
@@ -244,7 +296,7 @@ process_partis_yaml <- function(yaml_file_path, igblast_annotation_path, output_
       
       # Find naive sequence and IMGT-aligned observed sequences from this clone
       naive_seq <- substr(naive_seq, n_start_Ns +1, terminal_Ns_start -1)
-      imgt_aligned_seqs <- left_join(tibble(SEQUENCE_ID = productive_seqs),
+      imgt_aligned_seqs <- left_join(tibble(SEQUENCE_ID = productive_seqs[productive_seqs != 'NAIVE']),
                                      igblast_annotation %>% filter(SEQUENCE_ID %in% productive_seqs),
                                      by = 'SEQUENCE_ID') 
       # Check all imgt-aligned regions have the same length (except possibly CDR3 and FR4)

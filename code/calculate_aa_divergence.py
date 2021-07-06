@@ -64,52 +64,44 @@ def calc_pairwise_divergence(alignment):
 
 
 def main(argv):
-    dataset = argv[1]
+
+    alignment_path = argv[1]
     reference_seq_id = argv[2]
 
+    alignment = AlignIO.read(alignment_path, 'fasta')
+    #alignment = remove_mostly_gaps(alignment)
 
-    dataset_dir = '../results/partis/' + dataset + '_clones/'
-    
-    alignment_files = glob.glob(dataset_dir + '*alignment.fasta')
-    
-    for alignment_path in alignment_files:
+    #parent_dir = os.path.dirname(alignment_path)
+    alignment_name = re.search(r'[^/]+\.fasta', alignment_path).group().replace('_alignment','').replace('.fasta','')
 
-        alignment = AlignIO.read(alignment_path, 'fasta')
-        #alignment = remove_mostly_gaps(alignment)
+    aa_divergence = calc_pairwise_divergence(alignment)
+    aa_divergence_from_ref = [aa_divergence[pair] for pair in aa_divergence.keys() if reference_seq_id in pair]
 
-        #parent_dir = os.path.dirname(alignment_path)
-        alignment_name = re.search(r'[^/]+\.fasta', alignment_path).group().replace('_alignment','').replace('.fasta','')
+    n_sites = str(len(translate_with_gaps(str(alignment[0].seq))))
+    # Number of sites in ref sequence (excluding gaps)
+    ref_seq = [translate_with_gaps(str(seq.seq).replace('-', '')) for seq in alignment if seq.id == reference_seq_id]
+    n_sites_ref = str(len(ref_seq[0]))
 
-        aa_divergence = calc_pairwise_divergence(alignment)
-        aa_divergence_from_ref = [aa_divergence[pair] for pair in aa_divergence.keys() if reference_seq_id in pair]
+    csv_header = 'reference,mean_divergence,median_divergence,min_divergence,max_divergence,sd'
+    csv_header = csv_header + ',n_sites_in_alignment,n_sites_in_reference_seq\n'
 
-        n_sites = str(len(translate_with_gaps(str(alignment[0].seq))))
-        # Number of sites in ref sequence (excluding gaps)
-        ref_seq = [translate_with_gaps(str(seq.seq).replace('-', '')) for seq in alignment if seq.id == reference_seq_id]
-        n_sites_ref = str(len(ref_seq[0]))
+    with open('../results/aa_divergence/' + alignment_name + '_pairwise_divergence.csv', 'w') as output:
+        output.write(csv_header)
+        mean_divergence = str(numpy.mean(aa_divergence.values()))
+        median_divergence = str(numpy.median(aa_divergence.values()))
+        min_divergence = str(min(aa_divergence.values()))
+        max_divergence = str(max(aa_divergence.values()))
+        sd = str(numpy.std(aa_divergence.values()))
 
-        csv_header = 'reference,mean_divergence,median_divergence,min_divergence,max_divergence,sd'
-        csv_header = csv_header + ',n_sites_in_alignment,n_sites_in_reference_seq\n'
+        mean_divergence_ref = str(numpy.mean(aa_divergence_from_ref))
+        median_divergence_ref = str(numpy.median(aa_divergence_from_ref))
+        min_divergence_ref = str(min(aa_divergence_from_ref))
+        max_divergence_ref = str(max(aa_divergence_from_ref))
+        sd_ref = str(numpy.std(aa_divergence_from_ref))
 
-        with open('../results/aa_divergence/' + alignment_name + '_pairwise_divergence.csv', 'w') as output:
-            output.write(csv_header)
-            mean_divergence = str(numpy.mean(aa_divergence.values()))
-            median_divergence = str(numpy.median(aa_divergence.values()))
-            min_divergence = str(min(aa_divergence.values()))
-            max_divergence = str(max(aa_divergence.values()))
-            sd = str(numpy.std(aa_divergence.values()))
+        output.write(','.join(['all_pairs', mean_divergence, median_divergence, min_divergence, max_divergence, sd, n_sites, n_sites_ref+'\n']))
 
-            mean_divergence_ref = str(numpy.mean(aa_divergence_from_ref))
-            median_divergence_ref = str(numpy.median(aa_divergence_from_ref))
-            min_divergence_ref = str(min(aa_divergence_from_ref))
-            max_divergence_ref = str(max(aa_divergence_from_ref))
-            sd_ref = str(numpy.std(aa_divergence_from_ref))
-
-            output.write(','.join(['all_pairs', mean_divergence, median_divergence, min_divergence,
-                                   max_divergence, sd, n_sites, n_sites_ref+'\n']))
-
-            output.write(','.join([reference_seq_id, mean_divergence_ref, median_divergence_ref, min_divergence_ref,
-                                   max_divergence_ref, sd_ref, n_sites, n_sites_ref + '\n']))
+        output.write(','.join([reference_seq_id, mean_divergence_ref, median_divergence_ref, min_divergence_ref,max_divergence_ref, sd_ref, n_sites, n_sites_ref + '\n']))
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ divergence_files_clone_ids <- unlist(lapply(as.list(divergence_files),
                                      FUN = function(x){
                                        clone_id = rev(strsplit(x,'/')[[1]])[1]
                                        clone_id = str_remove(clone_id, '_pairwise_divergence.csv')
+                                       clone_id = str_remove(clone_id,'_CDR3')
                                      }))
 
 divergence_files <- divergence_files[divergence_files_clone_ids %in% igphyml_clone_ids]
@@ -84,17 +85,24 @@ divergence_results <- lapply(as.list(divergence_files),
                                clone_number <- str_extract(dataset, 'clone_[0-9]+')
                                dataset <- str_remove(dataset, '_clone_[0-9]+_.*')
                                
+                               if(grepl('CDR3', path)){
+                                 region = 'CDR3'
+                               }else{
+                                 region = 'whole sequence'
+                               }
+                               
                                read_csv(path) %>%
-                                 mutate(dataset = dataset, clone_number = clone_number) %>%
-                                 select(dataset, clone_number, everything())
+                                 mutate(dataset = dataset, clone_number = clone_number, region = region) %>%
+                                 select(dataset, clone_number, region, everything())
                                
                              })
 
 # Export divergence results for the same clones we did IgPhyml 
-divergence_results <- bind_rows(divergence_results)
+divergence_results <- bind_rows(divergence_results) %>%
+  mutate(region = factor(region, levels = c('whole sequence','CDR3')))
 
-divergence_results <- left_join(igphyml_results %>% select(dataset, clone_number), divergence_results) %>%
-  filter(!is.na(mean_divergence))
+#divergence_results <- left_join(igphyml_results %>% select(dataset, clone_number), divergence_results) %>%
+#  filter(!is.na(mean_divergence))
 
 write_csv(divergence_results, '../results/divergence_results.csv')
 
@@ -107,9 +115,11 @@ divergence_results_pl <- divergence_results %>%
   xlab('Patient') +
   scale_x_discrete(labels = function(x){str_remove(x,'_HC')}) +
   background_grid() +
-  theme(legend.position = c(0.9,0.9))
+  theme(legend.position = c(0.9,0.9),
+        axis.text.x = element_text(size = 9)) +
+  facet_wrap('region')
 save_plot('../figures/divergence_from naive.pdf', divergence_results_pl,
-          base_width = 12, base_height = 6)
+          base_width = 20, base_height = 8)
   
 
   
