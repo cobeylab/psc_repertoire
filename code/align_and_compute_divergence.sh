@@ -22,7 +22,6 @@ echo module load mafft/7.310  >> $sbatch_file
 echo INPUT_FILE=../results/partis/${dataset}_clones/${dataset}_clone_'${SLURM_ARRAY_TASK_ID}'.fasta >> $sbatch_file
 echo OUTPUT_FILE=../results/partis/${dataset}_clones/${dataset}_clone_'${SLURM_ARRAY_TASK_ID}'_alignment.fasta >> $sbatch_file
 
-
 echo mafft --op 5 --thread -1 '$INPUT_FILE' '>' '$OUTPUT_FILE' >> $sbatch_file
 
 # Immediately after aligning, compute pairwise divergence

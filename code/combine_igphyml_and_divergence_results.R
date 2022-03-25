@@ -9,9 +9,6 @@ divergence_files <- list.files('../results/aa_divergence/', full.names = T)
 
 # Import only divergence results for clones with IgPhyml results 
 # (so we only look at the top clones, excluding any that have fewer than 2 seqs.)
-retrieve_clone_id <- function(file_path){}
-
-
 igphyml_clone_ids <- unlist(lapply(as.list(igphyml_files),
                             FUN = function(x){
                               clone_id = rev(strsplit(x,'/')[[1]])[1]
