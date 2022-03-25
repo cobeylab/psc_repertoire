@@ -10,7 +10,7 @@ data
 *.pyc
 *.sbatch
 code/_output/
-*._
+code/._*
 
 
 
